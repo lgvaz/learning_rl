@@ -97,6 +97,7 @@ with tf.Session() as sess:
         avg_length = np.sum(ep_lengths) / args.batch_size
         summary_writer(states, actions, value_errors, returns, avg_reward, avg_length)
         if i_episode % 10 == 0:
+            print('Saving model to: {}'.format(savedir))
             saver.save(sess, savepath)
         # Print information
         print('Episode {}/{} | Avg_reward: {}'.format(i_episode, args.num_episodes, avg_reward))
