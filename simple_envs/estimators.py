@@ -54,7 +54,7 @@ class QNet:
         local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
         # Calcuate gradients
         grads_and_vars = opt.compute_gradients(self.loss, local_vars)
-        if clip_grads == True:
+        if clip_grads == 'Y':
             grads_and_vars = [(tf.clip_by_value(grad, -1, 1), var)
                              for grad, var in grads_and_vars]
         self.global_step = slim.get_or_create_global_step()
@@ -110,30 +110,30 @@ class QNet:
 
         # Create placeholders to track some statistics
         episode_reward = tf.placeholder(name='episode_reward',
-                                             shape=[],
+                                             shape=(),
                                              dtype=tf.float32)
         episode_length = tf.placeholder(name='episode_length',
-                                             shape=[],
+                                             shape=(),
                                              dtype=tf.float32)
-        epsilon = tf.placeholder(name='epsilon',
-                                 shape=[],
+        episode_epsilon = tf.placeholder(name='epsilon',
+                                 shape=(),
                                  dtype=tf.float32)
         # Create some summaries
         tf.summary.scalar('reward', episode_reward)
         tf.summary.scalar('episode_length', episode_length)
-        tf.summary.scalar('epsilon', epsilon)
+        tf.summary.scalar('epsilon', episode_epsilon)
         # Merge all summaries
         merged = tf.summary.merge_all()
         global_step = slim.get_or_create_global_step()
 
         def summary_writer(states, actions, targets, reward, length, epsilon):
             feed_dict = {
-                self.states: states,
-                self.actions: actions,
-                self.targets: targets,
-                episode_reward: reward,
-                episode_length: length,
-                epsilon: epsilon
+                self.states: np.squeeze(states),
+                self.actions: np.squeeze(actions),
+                self.targets: np.squeeze(targets),
+                episode_reward: np.squeeze(reward),
+                episode_length: np.squeeze(length),
+                episode_epsilon: np.squeeze(epsilon)
             }
             summary, step = sess.run([merged, global_step],
                                      feed_dict=feed_dict)
