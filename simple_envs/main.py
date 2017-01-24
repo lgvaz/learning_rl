@@ -125,7 +125,7 @@ with tf.Session() as sess:
 
             for i_step in itertools.count():
                 # Exponentially decay epsilon
-                epsilon = args.epsilon_min + (args.epsilon_max - args.epsilon_min) * np.exp(-epsilon_step * i_episode)
+                epsilon = args.epsilon_min + (args.epsilon_max - args.epsilon_min) * np.exp(-epsilon_step * i_step)
                 # Choose an action
                 action_values = main_qnet.predict(sess, state[np.newaxis])
                 action_probs = egreedy_policy(action_values, epsilon)
