@@ -7,19 +7,6 @@ import tensorflow as tf
 from memory import ReplayMemory
 from estimators import QNet, copy_vars, egreedy_policy
 
-#env_name = 'LunarLander-v2'
-#num_episodes = 100000
-#max_replays = 200000
-#min_replays = 100000
-#learning_rate = 3e-4
-#clip_grads = True
-#logdir = os.path.join(args.env_name, 'summaries')
-#epsilon_min = 0.1
-#epsilon_max = 1
-#batch_size = 32
-#stop_exploration = 10000
-#discount_factor = 0.99
-#target_update_frequency = 10000
 
 parser = argparse.ArgumentParser(description=(
                                  'Run training episodes, periodically saves the model, '
@@ -57,7 +44,7 @@ env = gym.make(args.env_name)
 num_actions = env.action_space.n
 num_features = env.observation_space.shape[0]
 logdir = os.path.join('experiments', args.env_name, 'summaries', exp_name)
-savedir = os.path.join('experiments', args.env_name, 'summaries', exp_name)
+savedir = os.path.join('experiments', args.env_name, 'checkpoints', exp_name)
 # Create checkpoint directory
 if not os.path.exists(savedir):
     os.makedirs(savedir)
@@ -81,6 +68,7 @@ for i_replay in range(args.min_replays):
         state = env.reset()
     else:
         state = next_state
+print()
 
 # Create network
 main_qnet = QNet(num_features=num_features,
@@ -118,6 +106,7 @@ with tf.Session() as sess:
 
     print('Started training...')
     num_steps = 0
+    global_step = 0
     for i_episode in range(args.num_episodes):
             # Restart env
             state = env.reset()
@@ -125,7 +114,8 @@ with tf.Session() as sess:
 
             for i_step in itertools.count():
                 # Exponentially decay epsilon
-                epsilon = args.epsilon_min + (args.epsilon_max - args.epsilon_min) * np.exp(-epsilon_step * i_step)
+                epsilon = args.epsilon_min + (args.epsilon_max - args.epsilon_min) * np.exp(-epsilon_step * global_step)
+                global_step += 1
                 # Choose an action
                 action_values = main_qnet.predict(sess, state[np.newaxis])
                 action_probs = egreedy_policy(action_values, epsilon)
