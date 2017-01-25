@@ -1,5 +1,6 @@
 import os
 import gym
+from gym import wrappers
 import argparse
 import itertools
 import numpy as np
@@ -37,18 +38,34 @@ parser.add_argument('--min_replays', type=int, default=100000,
 parser.add_argument('--number_steps_limit', type=int, default=1500,
                     help='Number of maximum steps allowed per episode (default=1500)')
 args = parser.parse_args()
+
 # Ask experiment name
 exp_name = input('Name of experiment: ')
-
-env = gym.make(args.env_name)
-num_actions = env.action_space.n
-num_features = env.observation_space.shape[0]
-logdir = os.path.join('experiments', args.env_name, 'summaries', exp_name)
-savedir = os.path.join('experiments', args.env_name, 'checkpoints', exp_name)
+envdir = os.path.join('experiments', args.env_name)
+argsdir = os.path.join(envdir, 'args')
+logdir = os.path.join(envdir, 'summaries', exp_name)
+savedir = os.path.join(envdir, 'checkpoints', exp_name)
+videodir = os.path.join(envdir, 'videos', exp_name)
+# Save args to a file
+if not os.path.exists(argsdir):
+    os.makedirs(argsdir)
+argspath = os.path.join(argsdir, exp_name) + '.txt'
+with open(argspath, 'w') as f:
+    for arg, value in args.__dict__.items():
+        f.write(': '.join([str(arg), str(value)]))
+        f.write('\n')
 # Create checkpoint directory
 if not os.path.exists(savedir):
     os.makedirs(savedir)
 savepath = os.path.join(savedir, 'graph.ckpt')
+# Create videos directory
+if not os.path.exists(videodir):
+    os.makedirs(videodir)
+
+# Create env
+env = gym.make(args.env_name)
+num_actions = env.action_space.n
+num_features = env.observation_space.shape[0]
 
 # Create experience replay
 replays = ReplayMemory(args.max_replays, num_features)
@@ -86,6 +103,11 @@ target_qnet = QNet(num_features=num_features,
 
 # Calculate epsilon step size
 epsilon_step = -np.log(args.epsilon_min) / args.stop_exploration
+# Configure the maximum number of steps
+env.spec.tags.update({'wrapper_config.TimeLimit.max_episode_steps': args.number_steps_limit})
+# Create monitor for recording episodes
+env = wrappers.Monitor(env=env, directory=videodir, force=True)
+
 
 with tf.Session() as sess:
     # Create tensorflow saver
@@ -114,7 +136,8 @@ with tf.Session() as sess:
 
             for i_step in itertools.count():
                 # Exponentially decay epsilon
-                epsilon = args.epsilon_min + (args.epsilon_max - args.epsilon_min) * np.exp(-epsilon_step * global_step)
+                epsilon = args.epsilon_min + (args.epsilon_max - args.epsilon_min) \
+                          * np.exp(-epsilon_step * global_step)
                 global_step += 1
                 # Choose an action
                 action_values = main_qnet.predict(sess, state[np.newaxis])
@@ -144,7 +167,7 @@ with tf.Session() as sess:
                     target_update()
 
                 # Update state
-                if done or i_step == 1500:
+                if done:
                     break
                 else:
                     state = next_state
