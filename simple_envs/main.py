@@ -21,6 +21,8 @@ parser.add_argument('target_update_frequency', type=int,
 parser.add_argument('--learning_rate', type=float, default=3e-4,
                     help='Learning rate used when performing gradient descent (default: 3e-4)')
 # TODO: improve help text
+parser.add_argument('--double_learning', type=str, choices=['Y', 'N'], default='N',
+                    help='Whether double q-learning should be used or not (default=N)')
 parser.add_argument('--clip_grads', type=str, choices=['Y', 'N'], default='Y',
                     help='Whether the grads should be clipped or not (default=Y)')
 parser.add_argument('--discount_factor', type=float, default=0.99,
@@ -46,6 +48,13 @@ argsdir = os.path.join(envdir, 'args')
 logdir = os.path.join(envdir, 'summaries', exp_name)
 savedir = os.path.join(envdir, 'checkpoints', exp_name)
 videodir = os.path.join(envdir, 'videos', exp_name)
+# Create checkpoint directory
+if not os.path.exists(savedir):
+    os.makedirs(savedir)
+savepath = os.path.join(savedir, 'graph.ckpt')
+# Create videos directory
+if not os.path.exists(videodir):
+    os.makedirs(videodir)
 # Save args to a file
 if not os.path.exists(argsdir):
     os.makedirs(argsdir)
@@ -54,13 +63,6 @@ with open(argspath, 'w') as f:
     for arg, value in args.__dict__.items():
         f.write(': '.join([str(arg), str(value)]))
         f.write('\n')
-# Create checkpoint directory
-if not os.path.exists(savedir):
-    os.makedirs(savedir)
-savepath = os.path.join(savedir, 'graph.ckpt')
-# Create videos directory
-if not os.path.exists(videodir):
-    os.makedirs(videodir)
 
 # Create env
 env = gym.make(args.env_name)
@@ -151,9 +153,17 @@ with tf.Session() as sess:
 
                 # Sample a batch to train
                 b_states, b_next_states, b_actions, b_rewards, b_done = replays.sample(args.batch_size)
-                # Calculate next max Q
-                b_value_next_states = target_qnet.predict(sess, b_next_states)
-                b_next_qmax = np.max(b_value_next_states, axis=1)
+                # Calculate best action value using simple q-learning
+                if args.double_learning == 'N':
+                    # Calculate next max Q
+                    b_value_next_states = target_qnet.predict(sess, b_next_states)
+                    b_next_qmax = np.max(b_value_next_states, axis=1)
+                # Calculate best action value using double q-learning
+                if args.double_learning == 'Y':
+                    b_value_next_states = main_qnet.predict(sess, b_next_states)
+                    b_next_action = np.argmax(b_value_next_states, axis=1)
+                    b_next_q = target_qnet.predict(sess, b_next_states)
+                    b_next_qmax = b_next_q[np.arange(args.batch_size), b_next_action]
                 # Calculate TD targets
                 b_targets = b_rewards + (1 - b_done) * args.discount_factor * b_next_qmax
 
