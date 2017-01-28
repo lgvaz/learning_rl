@@ -1,4 +1,3 @@
-import time
 import gym
 from gym import wrappers
 import itertools
@@ -8,26 +7,27 @@ from threading import Thread, Lock
 from estimators import *
 
 class Worker:
-    def __init__(self, env_name, num_actions, num_workers, num_steps, stop_exploration, discount_factor, online_update_step, target_update_step, online_net, target_net, sess, coordinator):
-        self.online_net = online_net
-        self.target_net = target_net
-        self.sess = sess
-#    def __init__(self, env_name, num_actions, num_workers, num_steps, coordinator):
+    def __init__(self, env_name, num_actions, num_workers,
+                 num_steps, stop_exploration, final_epsilon, discount_factor,
+                 online_update_step, target_update_step, online_net,
+                 target_net, sess, coord):
         self.env_name = env_name
         self.num_actions = num_actions
         self.num_workers = num_workers
         self.num_steps = num_steps
         self.stop_exploration = stop_exploration
+        self.final_epsilon = final_epsilon
         self.discount_factor = discount_factor
         self.online_update_step = online_update_step
         self.target_update_step = target_update_step
-        self.coord = coordinator
+        self.online_net = online_net
+        self.target_net = target_net
+        self.sess = sess
+        self.coord = coord
         # Target update operation
         self.target_update = target_update = copy_vars(sess=sess, from_scope='online', to_scope='target')
         # Shared global step
         self.global_step = 0
-        # Define final epsilon
-        self.final_epsilon = np.array([0.1, 0.01, 0.5])
         # Creates locks
         self.global_step_lock = Lock()
         self.create_env_lock = Lock()
