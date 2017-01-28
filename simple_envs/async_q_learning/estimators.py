@@ -36,8 +36,8 @@ class QNet:
 
         # Define network architecture
         with tf.variable_scope(scope):
-            self.fc = slim.fully_connected(self.states, 2)
-            self.fc = slim.fully_connected(self.fc, 2)
+            self.fc = slim.fully_connected(self.states, 40)
+            self.fc = slim.fully_connected(self.fc, 40)
             self.outputs = slim.fully_connected(self.fc, num_actions,
                                                 activation_fn=None)
 
@@ -49,15 +49,16 @@ class QNet:
         actions_value = tf.gather(tf.reshape(self.outputs, [-1]), actions_ids)
         # Calculate mean squared error
         self.loss = tf.reduce_mean(tf.squared_difference(self.targets, actions_value))
-        self.opt = tf.train.AdamOptimizer(learning_rate)
+        opt = tf.train.AdamOptimizer(learning_rate)
         # Get list of variables given by scope
         local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
         # Calcuate gradients
-        self.grads_and_vars = self.opt.compute_gradients(self.loss, local_vars)
+        grads_and_vars = opt.compute_gradients(self.loss, local_vars)
         if clip_grads == 'Y':
-            self.grads_and_vars = [(tf.clip_by_value(grad, -1, 1), var)
-                             for grad, var in self.grads_and_vars]
+            grads_and_vars = [(tf.clip_by_value(grad, -1, 1), var)
+                             for grad, var in grads_and_vars]
         self.global_step = slim.get_or_create_global_step()
+        self.training_op = opt.apply_gradients(grads_and_vars, self.global_step)
 
         if create_summary:
             # Add summaries
@@ -76,7 +77,7 @@ class QNet:
         '''
         return sess.run(self.outputs, feed_dict={self.states: states})
 
-    def compute_grads(self, sess, states, actions, targets):
+    def update(self, sess, states, actions, targets):
         '''
         Performs the optimization process
 
@@ -89,12 +90,7 @@ class QNet:
         feed_dict = {self.states: states,
                      self.actions: actions,
                      self.targets: targets}
-        grads_and_vars = sess.run(self.grads_and_vars, feed_dict=feed_dict)
-        return grads_and_vars
-
-    def apply_grads(self, sess, grads, vars):
-        grads_and_vars = list(zip(grads, vars))
-        sess.run(self.opt.apply_gradients(grads_and_vars, self.global_step))
+        sess.run(self.training_op, feed_dict=feed_dict)
 
     def create_summary_op(self, sess, logdir):
         '''
@@ -170,12 +166,27 @@ def copy_vars(sess, from_scope, to_scope):
     return run_op
 
 
-def egreedy_policy(q_value, epsilon):
+def egreedy_policy(q_value, epsilon_list):
     '''
     Returns actions probabilities based on an epsilon greedy policy
     '''
+    # Sample an epsilon value to be used
+    epsilon = np.random.choice(epsilon_list, p=[0.4, 0.3, 0.3])
+    # Sample an action
     num_actions = len(np.squeeze(q_value))
     actions = (np.ones(num_actions) * epsilon) / num_actions
     best_action = np.argmax(np.squeeze(q_value))
     actions[best_action] += 1 - epsilon
     return actions
+
+def get_epsilon_op(final_epsilon, stop_exploration):
+    epsilon_step = -np.log(final_epsilon) / stop_exploration
+
+    def get_epsilon(step):
+        # Exponentially decay epsilon until it reaches the minimum
+        if step <= stop_exploration:
+            new_epsilon = np.exp(-epsilon_step * step)
+            return new_epsilon
+        else:
+            return final_epsilon
+    return get_epsilon
