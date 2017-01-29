@@ -7,10 +7,10 @@ from threading import Thread, Lock
 from estimators import *
 
 class Worker:
-    def __init__(self, env_name, num_actions, num_workers,
-                 num_steps, stop_exploration, final_epsilon, discount_factor,
+    def __init__(self, env_name, num_actions, num_workers, num_steps,
+                 stop_exploration, final_epsilon, discount_factor,
                  online_update_step, target_update_step, online_net,
-                 target_net, sess, coord):
+                 target_net, sess, coord, saver, summary_writer, videodir):
         self.env_name = env_name
         self.num_actions = num_actions
         self.num_workers = num_workers
@@ -24,14 +24,19 @@ class Worker:
         self.target_net = target_net
         self.sess = sess
         self.coord = coord
+        self.saver = saver
+        self.summary_writer = summary_writer
+        self.videodir = videodir
         # Target update operation
         self.target_update = target_update = copy_vars(sess=sess, from_scope='online', to_scope='target')
+        self.target_update()
         # Shared global step
         self.global_step = 0
         # Creates locks
         self.global_step_lock = Lock()
         self.create_env_lock = Lock()
         self.render_lock = Lock()
+        self.summary_lock = Lock()
 
     def run(self):
         # Create workers
@@ -52,6 +57,8 @@ class Worker:
         # Starting more than one env at once may break gym
         with self.create_env_lock:
             env = gym.make(self.env_name)
+            # Configure the maximum number of steps
+            env.spec.tags.update({'wrapper_config.TimeLimit.max_episode_steps': 1500})
 
         # TODO: add monitor
         # Create a monitor for only one env
@@ -112,13 +119,6 @@ class Worker:
                     break
                 state = next_state
 
-            print('Step: {} | Reward: {}'.format(self.global_step, ep_reward))
-
-
-if __name__ == '__main__':
-    coord = tf.train.Coordinator()
-    workers = Worker('MountainCar-v0', 2, 2, 4000, coord)
-    workers.run()
-
-    # Wait until all threads are done
-    print('Done!')
+            # Write summary
+            self.summary_writer(states, actions, targets, ep_reward, local_step, self.global_step)
+            print('Step: {} | Reward: {} | Length {}'.format(self.global_step, ep_reward, local_step))

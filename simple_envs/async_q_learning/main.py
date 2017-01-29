@@ -58,9 +58,10 @@ savepath = os.path.join(savedir, 'graph.ckpt')
 # Create videos directory
 if not os.path.exists(videodir):
     os.makedirs(videodir)
-# Save args to a file
+# Create args directory
 if not os.path.exists(argsdir):
     os.makedirs(argsdir)
+# Save args to a file
 argspath = os.path.join(argsdir, exp_name) + '.txt'
 with open(argspath, 'w') as f:
     for arg, value in args.__dict__.items():
@@ -82,7 +83,20 @@ target_net = QNet(num_features, num_actions, args.learning_rate,
 # Create tensorflow coordinator to manage when threads should stop
 coord = tf.train.Coordinator()
 with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
+    # Create tensorflow saver
+    saver = tf.train.Saver()
+    # Verify if a checkpoint already exists
+    latest_checkpoint = tf.train.latest_checkpoint(savedir)
+    if latest_checkpoint is not None:
+        print('Loading latest checkpoint...')
+        saver.restore(sess, latest_checkpoint)
+    else:
+        # Initialize all variables
+        sess.run(tf.global_variables_initializer())
+
+    # Create summary writer
+    summary_writer = online_net.create_summary_op(sess, logdir)
+
 #    workers = Worker(args.env_name, num_actions, args.num_workers, args.num_steps, args.stop_exploration, args.final_epsilon, args.discount_factor, args.online_update_step, args.target_update_step, online_net, target_net, sess, coord)
     workers = Worker(
         env_name=args.env_name,
@@ -97,6 +111,9 @@ with tf.Session() as sess:
         online_net=online_net,
         target_net=target_net,
         sess=sess,
-        coord=coord
+        coord=coord,
+        saver=saver,
+        summary_writer=summary_writer,
+        videodir=videodir
     )
     workers.run()

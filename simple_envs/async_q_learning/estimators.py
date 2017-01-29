@@ -110,32 +110,30 @@ class QNet:
 
         # Create placeholders to track some statistics
         episode_reward = tf.placeholder(name='episode_reward',
-                                             shape=(),
-                                             dtype=tf.float32)
+                                        shape=(),
+                                        dtype=tf.float32)
         episode_length = tf.placeholder(name='episode_length',
-                                             shape=(),
-                                             dtype=tf.float32)
-        episode_epsilon = tf.placeholder(name='epsilon',
-                                 shape=(),
-                                 dtype=tf.float32)
+                                        shape=(),
+                                        dtype=tf.float32)
+        episode_global_step = tf.placeholder(name='global_step',
+                                     shape=(),
+                                     dtype=tf.int32)
         # Create some summaries
         tf.summary.scalar('reward', episode_reward)
         tf.summary.scalar('episode_length', episode_length)
-        tf.summary.scalar('epsilon', episode_epsilon)
         # Merge all summaries
         merged = tf.summary.merge_all()
-        global_step = slim.get_or_create_global_step()
 
-        def summary_writer(states, actions, targets, reward, length, epsilon):
+        def summary_writer(states, actions, targets, reward, length, global_step):
             feed_dict = {
-                self.states: np.squeeze(states),
-                self.actions: np.squeeze(actions),
-                self.targets: np.squeeze(targets),
-                episode_reward: np.squeeze(reward),
-                episode_length: np.squeeze(length),
-                episode_epsilon: np.squeeze(epsilon)
+                self.states: states,
+                self.actions: actions,
+                self.targets: targets,
+                episode_reward: reward,
+                episode_length: length,
+                episode_global_step: global_step
             }
-            summary, step = sess.run([merged, global_step],
+            summary, step = sess.run([merged, episode_global_step],
                                      feed_dict=feed_dict)
 
             # Write summary
