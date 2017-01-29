@@ -9,8 +9,8 @@ from estimators import *
 class Worker:
     def __init__(self, env_name, num_actions, num_workers, num_steps,
                  stop_exploration, final_epsilon, discount_factor,
-                 online_update_step, target_update_step, online_net,
-                 target_net, sess, coord, saver, summary_writer, videodir):
+                 online_update_step, target_update_step, online_net, target_net,
+                 double_learning, sess, coord, saver, summary_writer, videodir):
         self.env_name = env_name
         self.num_actions = num_actions
         self.num_workers = num_workers
@@ -22,6 +22,7 @@ class Worker:
         self.target_update_step = target_update_step
         self.online_net = online_net
         self.target_net = target_net
+        self.double_learning = double_learning
         self.sess = sess
         self.coord = coord
         self.saver = saver
@@ -88,9 +89,17 @@ class Worker:
                 next_state, reward, done, _ = env.step(action)
                 ep_reward += reward
 
+                # Calculate simple Q learning max action value
+                if self.double_learning == 'N':
+                    next_action_values = self.target_net.predict(self.sess, next_state[np.newaxis])
+                    next_max_action_value = np.max(next_action_values)
+                # Calculate double Q learning max action value
+                if self.double_learning == 'Y':
+                    next_action_values = self.online_net.predict(self.sess, next_state[np.newaxis])
+                    next_action = np.argmax(next_action_values)
+                    next_action_values_target = self.online_net.predict(self.sess, next_state[np.newaxis])
+                    next_max_action_value = np.squeeze(next_action_values_target)[next_action]
                 # Calculate TD target
-                next_action_values = self.target_net.predict(self.sess, next_state[np.newaxis])
-                next_max_action_value = np.max(next_action_values)
                 td_target = reward + (1 - done) * self.discount_factor * next_max_action_value
                 # Store experience
                 experience.append((state, action, td_target))
@@ -115,10 +124,12 @@ class Worker:
                         self.coord.request_stop()
 
                 # Update state
-                if done:
+                if done or local_step == 1500:
                     break
                 state = next_state
 
             # Write summary
-            self.summary_writer(states, actions, targets, ep_reward, local_step, self.global_step)
+            if name == 1:
+                self.summary_writer(states, actions, targets, ep_reward, local_step, self.global_step)
+
             print('Step: {} | Reward: {} | Length {}'.format(self.global_step, ep_reward, local_step))

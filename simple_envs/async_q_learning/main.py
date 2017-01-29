@@ -28,8 +28,10 @@ parser.add_argument('stop_exploration', type=int,
 parser.add_argument('target_update_step', type=int,
                     help='Update target network every "n" steps')
 # Optional arguments
+parser.add_argument('--double_learning', type=str, choices=['Y', 'N'], default='N',
+                    help='Wheter to use double Q-learning or not (default=N)')
 parser.add_argument('--learning_rate', type=float, default=3e-4,
-                    help='Learning rate used when performing gradient descent (default: 3e-4)')
+                    help='Learning rate used when performing gradient descent (default=3e-4)')
 parser.add_argument('--num_workers', type=int, default=8,
                     help='Number of parallel threads (default=8)')
 parser.add_argument('--online_update_step', type=int, default=5,
@@ -76,7 +78,7 @@ env.close()
 
 # Create the shared networks
 online_net = QNet(num_features, num_actions, args.learning_rate,
-                  scope='online', clip_grads='N')
+                  scope='online', clip_grads='N', create_summary=True)
 target_net = QNet(num_features, num_actions, args.learning_rate,
                   scope='target', clip_grads='N')
 
@@ -110,6 +112,7 @@ with tf.Session() as sess:
         target_update_step=args.target_update_step,
         online_net=online_net,
         target_net=target_net,
+        double_learning=args.double_learning,
         sess=sess,
         coord=coord,
         saver=saver,
