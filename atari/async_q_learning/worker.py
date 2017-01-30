@@ -1,11 +1,10 @@
 import gym
-from gym import wrappers
 import itertools
 import numpy as np
 import tensorflow as tf
 from threading import Thread, Lock
 from estimators import *
-from utils import preprocess
+from atari_envs import AtariWrapper
 
 class Worker:
     def __init__(self, env_name, num_actions, num_workers, num_steps,
@@ -59,21 +58,23 @@ class Worker:
         print('Starting worker {}...'.format(name))
         # Starting more than one env at once may break gym
         with self.create_env_lock:
-            env = gym.make(self.env_name)
+            # env = gym.make(self.env_name)
+            if name == 0:
+                env = AtariWrapper(self.env_name, self.videodir)
+            else:
+                env = AtariWrapper(self.env_name)
             # Configure the maximum number of steps
             # env.spec.tags.update({'wrapper_config.TimeLimit.max_episode_steps': 1500})
 
         # TODO: add monitor
         # Create a monitor for only one env
-             env = wrappers.Monitor(env=env, directory=self.videodir, force=True)
+            #env = wrappers.Monitor(env=env, directory=self.videodir, force=True)
 
         get_epsilon = get_epsilon_op(self.final_epsilon, self.stop_exploration)
         # Repeat until coord requests a stop
         while not self.coord.should_stop():
             state = env.reset()
             # Create first stacked frames
-            state = preprocess(state)
-            state = np.stack([state] * 4, axis=2)
             experience = []
             ep_reward = 0
             for local_step in itertools.count():
@@ -91,8 +92,6 @@ class Worker:
                 # Do the action
                 next_state, reward, done, _ = env.step(action)
                 # Build frames history
-                next_state = preprocess(next_state)
-                next_state = np.append(state[:, :, 1:], next_state[:, :, np.newaxis], axis=2)
                 ep_reward += reward
 
                 # Calculate simple Q learning max action value
