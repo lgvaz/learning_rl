@@ -74,8 +74,6 @@ class Worker:
             for local_step in itertools.count():
                 # with self.render_lock:
                 #     env.render()
-                # Take random action
-#                action = np.random.choice(np.arange(self.num_actions))
                 # Increment global step
                 with self.global_step_lock:
                     self.global_step += 1

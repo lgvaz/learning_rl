@@ -5,17 +5,6 @@ import tensorflow as tf
 from worker import Worker
 from estimators import *
 
-# env_name = 'LunarLander-v2'
-# env = gym.make(env_name)
-# num_actions = env.action_space.n
-# num_features = env.observation_space.shape[0]
-# learning_rate = 0.002
-# num_workers = 8
-# num_steps = 1000000
-# stop_exploration = 300000
-# discount_factor = 0.99
-# online_update_step = 5
-# target_update_step = 6000
 
 # Command line options
 parser = argparse.ArgumentParser(description=(
@@ -99,7 +88,6 @@ with tf.Session() as sess:
     # Create summary writer
     summary_writer = online_net.create_summary_op(sess, logdir)
 
-#    workers = Worker(args.env_name, num_actions, args.num_workers, args.num_steps, args.stop_exploration, args.final_epsilon, args.discount_factor, args.online_update_step, args.target_update_step, online_net, target_net, sess, coord)
     workers = Worker(
         env_name=args.env_name,
         num_actions=num_actions,
