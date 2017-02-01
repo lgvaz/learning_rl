@@ -33,7 +33,8 @@ class Worker:
         self.target_update = target_update = copy_vars(sess=sess, from_scope='online', to_scope='target')
         self.target_update()
         # Shared global step
-        self.global_step = 0
+        self.global_step = slim.get_or_create_global_step()
+        self.increment_global_step = tf.assign(global_step, global_step + 1)
         # Creates locks
         self.global_step_lock = Lock()
         self.create_env_lock = Lock()
@@ -82,11 +83,12 @@ class Worker:
                 #     env.render()
                 # Increment global step
                 with self.global_step_lock:
-                    self.global_step += 1
+                    self.sess.run(self.increment_global_step())
+                global_step_value = sess.run(self.global_step)
                 # Compute action values with online net
                 action_values = self.online_net.predict(self.sess, state[np.newaxis])
                 # Compute epsilon and choose an action based on a egreedy policy
-                epsilon = get_epsilon(self.global_step)
+                epsilon = get_epsilon(global_step_value)
                 action_probs = egreedy_policy(action_values, epsilon)
                 action = np.random.choice(np.arange(self.num_actions), p=action_probs)
                 # Do the action
@@ -119,22 +121,22 @@ class Worker:
 
                 # Update target network
                 with self.global_step_lock:
-                    if self.global_step % self.target_update_step == 0:
-                        print('Step {}, updating target network'.format(self.global_step))
+                    if global_step_value % self.target_update_step == 0:
+                        print('Step {}, updating target network'.format(global_step_value))
                         self.target_update()
 
                 # If the maximum step is reached, request all threads to stop
-                if self.global_step == self.num_steps:
+                if global_step_value >= self.num_steps:
                     # with self.global_step_lock:
                         self.coord.request_stop()
 
                 # Update state
-                if done or local_step == 1500:
+                if done:
                     break
                 state = next_state
 
             # Write summary
             if name == 1:
-                self.summary_writer(states, actions, targets, ep_reward, local_step, self.global_step)
+                self.summary_writer(states, actions, targets, ep_reward, local_step, global_step_value)
 
-            print('Step: {} | Reward: {} | Length {}'.format(self.global_step, ep_reward, local_step))
+            print('Step: {} | Reward: {} | Length {}'.format(global_step_value, ep_reward, local_step))
