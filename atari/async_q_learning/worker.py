@@ -10,7 +10,7 @@ class Worker:
     def __init__(self, env_name, num_actions, num_workers, num_steps,
                  stop_exploration, final_epsilon, discount_factor,
                  online_update_step, target_update_step, online_net, target_net,
-                 double_learning, sess, coord, saver, summary_writer, videodir):
+                 double_learning, sess, coord, saver, summary_writer, savepath, videodir):
         self.env_name = env_name
         self.num_actions = num_actions
         self.num_workers = num_workers
@@ -28,6 +28,7 @@ class Worker:
         self.coord = coord
         self.saver = saver
         self.summary_writer = summary_writer
+        self.savepath = savepath
         self.videodir = videodir
         # Target update operation
         self.target_update = target_update = copy_vars(sess=sess, from_scope='online', to_scope='target')
@@ -59,17 +60,13 @@ class Worker:
         print('Starting worker {}...'.format(name))
         # Starting more than one env at once may break gym
         with self.create_env_lock:
-            # env = gym.make(self.env_name)
+            # Record videos of only one env
             if name == 0:
                 env = AtariWrapper(self.env_name, self.videodir)
             else:
                 env = AtariWrapper(self.env_name)
             # Configure the maximum number of steps
             # env.spec.tags.update({'wrapper_config.TimeLimit.max_episode_steps': 1500})
-
-        # TODO: add monitor
-        # Create a monitor for only one env
-            #env = wrappers.Monitor(env=env, directory=self.videodir, force=True)
 
         get_epsilon = get_epsilon_op(self.final_epsilon, self.stop_exploration)
         # Repeat until coord requests a stop
@@ -124,6 +121,10 @@ class Worker:
                     if global_step_value % self.target_update_step == 0:
                         print('Step {}, updating target network'.format(global_step_value))
                         self.target_update()
+                # Save model
+                if global_step_value % 100000 == 0:
+                    print('Saving model...')
+                    saver.save(self.sess, self.savepath)
 
                 # If the maximum step is reached, request all threads to stop
                 if global_step_value >= self.num_steps:
