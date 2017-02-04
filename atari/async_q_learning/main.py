@@ -5,17 +5,6 @@ from worker import Worker
 from estimators import *
 from atari_envs import AtariWrapper
 
-# env_name = 'LunarLander-v2'
-# env = gym.make(env_name)
-# num_actions = env.action_space.n
-# num_features = env.observation_space.shape[0]
-# learning_rate = 0.002
-# num_workers = 8
-# num_steps = 1000000
-# stop_exploration = 300000
-# discount_factor = 0.99
-# online_update_step = 5
-# target_update_step = 6000
 
 # Command line options
 parser = argparse.ArgumentParser(description=(
@@ -77,9 +66,11 @@ env.close()
 
 # Create the shared networks
 online_net = QNet(num_actions, args.learning_rate,
-                  scope='online', clip_grads='N', create_summary=True)
+                  scope='online', clip_grads=args.clip_grads, create_summary=True)
 target_net = QNet(num_actions, args.learning_rate,
-                  scope='target', clip_grads='N')
+                  scope='target', clip_grads=args.clip_grads)
+# Create shared global step
+global_step = tf.Variable(name='global_step', initial_value=0, trainable=False, dtype=tf.int32)
 
 # Create tensorflow coordinator to manage when threads should stop
 coord = tf.train.Coordinator()
@@ -111,6 +102,7 @@ with tf.Session() as sess:
         target_update_step=args.target_update_step,
         online_net=online_net,
         target_net=target_net,
+        global_step=global_step,
         double_learning=args.double_learning,
         sess=sess,
         coord=coord,

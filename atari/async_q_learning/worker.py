@@ -9,7 +9,7 @@ from atari_envs import AtariWrapper
 class Worker:
     def __init__(self, env_name, num_actions, num_workers, num_steps,
                  stop_exploration, final_epsilon, discount_factor,
-                 online_update_step, target_update_step, online_net, target_net,
+                 online_update_step, target_update_step, online_net, target_net, global_step,
                  double_learning, sess, coord, saver, summary_writer, savepath, videodir):
         self.env_name = env_name
         self.num_actions = num_actions
@@ -22,8 +22,9 @@ class Worker:
         self.target_update_step = target_update_step
         self.online_net = online_net
         self.target_net = target_net
+        self.global_step = global_step
         self.double_learning = double_learning
-        self.num_stacked_frames = 4,
+        self.num_stacked_frames = 4
         self.sess = sess
         self.coord = coord
         self.saver = saver
@@ -31,11 +32,11 @@ class Worker:
         self.savepath = savepath
         self.videodir = videodir
         # Target update operation
-        self.target_update = target_update = copy_vars(sess=sess, from_scope='online', to_scope='target')
+        self.target_update = copy_vars(sess=sess, from_scope='online', to_scope='target')
         self.target_update()
         # Shared global step
-        self.global_step = slim.get_or_create_global_step()
-        self.increment_global_step = tf.assign(global_step, global_step + 1)
+        #self.global_step = slim.get_or_create_global_step()
+        self.increment_global_step = tf.assign(self.global_step, self.global_step + 1)
         # Creates locks
         self.global_step_lock = Lock()
         self.create_env_lock = Lock()
@@ -80,8 +81,8 @@ class Worker:
                 #     env.render()
                 # Increment global step
                 with self.global_step_lock:
-                    self.sess.run(self.increment_global_step())
-                global_step_value = sess.run(self.global_step)
+                    self.sess.run(self.increment_global_step)
+                    global_step_value = self.sess.run(self.global_step)
                 # Compute action values with online net
                 action_values = self.online_net.predict(self.sess, state[np.newaxis])
                 # Compute epsilon and choose an action based on a egreedy policy
@@ -117,14 +118,19 @@ class Worker:
                     self.online_net.update(self.sess, states, actions, targets)
 
                 # Update target network
-                with self.global_step_lock:
-                    if global_step_value % self.target_update_step == 0:
-                        print('Step {}, updating target network'.format(global_step_value))
-                        self.target_update()
+                if global_step_value % self.target_update_step == 0:
+                    print('Updating target network...')
+                    self.target_update()
+
+                # Write summary
+                if global_step_value % 10000 == 0:
+                    print('Writing summary...')
+                    self.summary_writer(states, actions, targets, ep_reward, local_step, global_step_value)
+
                 # Save model
                 if global_step_value % 100000 == 0:
                     print('Saving model...')
-                    saver.save(self.sess, self.savepath)
+                    self.saver.save(self.sess, self.savepath)
 
                 # If the maximum step is reached, request all threads to stop
                 if global_step_value >= self.num_steps:
@@ -135,9 +141,5 @@ class Worker:
                 if done:
                     break
                 state = next_state
-
-            # Write summary
-            if name == 1:
-                self.summary_writer(states, actions, targets, ep_reward, local_step, global_step_value)
 
             print('Step: {} | Reward: {} | Length {}'.format(global_step_value, ep_reward, local_step))
