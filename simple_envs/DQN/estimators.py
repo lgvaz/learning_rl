@@ -36,8 +36,8 @@ class QNet:
 
         # Define network architecture
         with tf.variable_scope(scope):
-            self.fc = slim.fully_connected(self.states, 16)
-            self.fc = slim.fully_connected(self.fc, 16)
+            self.fc = slim.fully_connected(self.states, 40)
+            self.fc = slim.fully_connected(self.fc, 40)
             self.outputs = slim.fully_connected(self.fc, num_actions,
                                                 activation_fn=None)
 
