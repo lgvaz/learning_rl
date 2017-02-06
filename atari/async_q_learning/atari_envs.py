@@ -11,6 +11,9 @@ def preprocess(img):
 
 
 class AtariWrapper:
+    '''
+    Wraps atari gym env, the new env returns the last N frames.
+    '''
     def __init__(self, env_name, videodir=None):
         self.env = gym.make(env_name)
         if videodir is not None:
@@ -24,12 +27,18 @@ class AtariWrapper:
             self.valid_actions = np.arange(num_actions)
 
     def reset(self):
+        '''
+        Reset the env and returns the first frame repeated N times
+        '''
         state = self.env.reset()
         state = preprocess(state)
         self.states_hist = np.stack([state] * 4, axis=2)
         return self.states_hist
 
     def step(self, action):
+        '''
+        Execute the action on the gym env and returns the last N frames
+        '''
         next_state, reward, done, info = self.env.step(self.valid_actions[action])
         next_state = preprocess(next_state)
         self.states_hist = np.append(self.states_hist[:, :, 1:], next_state[:, :, np.newaxis], axis=2)
