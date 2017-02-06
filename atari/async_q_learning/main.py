@@ -9,7 +9,9 @@ from atari_envs import AtariWrapper
 # Command line options
 parser = argparse.ArgumentParser(description=(
                                  'Run training episodes, periodically saves the model, '
-                                 'and creates a tensorboard summary.'))
+                                 'creates a tensorboard summary, and saves the video.\n'
+                                 'If the name of the experiment already exists, the'
+                                 'training will load from last checkpoint'))
 parser.add_argument('env_name', type=str, help='Gym environment name')
 parser.add_argument('num_steps', type=int, help='Number of training steps')
 parser.add_argument('stop_exploration', type=int,
@@ -31,6 +33,7 @@ parser.add_argument('--discount_factor', type=float, default=0.99,
                     help='How much the agent should look into the future (default=0.99)')
 parser.add_argument('--final_epsilon', type=list, default=[0.1, 0.01, 0.5],
                     help='List of minimum exploration rates (default=[0.1, 0.01, 0.5])')
+# TODO: This option is probably not relevant on atari envs, maybe remove it
 parser.add_argument('--number_steps_limit', type=int, default=1500,
                     help='Number of maximum steps allowed per episode (default=1500)')
 args = parser.parse_args()
@@ -59,7 +62,7 @@ with open(argspath, 'w') as f:
         f.write(': '.join([str(arg), str(value)]))
         f.write('\n')
 
-# Get num_action and num_features
+# Get num_actions
 env = AtariWrapper(args.env_name)
 num_actions = len(env.valid_actions)
 env.close()
@@ -89,7 +92,6 @@ with tf.Session() as sess:
     # Create summary writer
     summary_writer = online_net.create_summary_op(sess, logdir)
 
-#    workers = Worker(args.env_name, num_actions, args.num_workers, args.num_steps, args.stop_exploration, args.final_epsilon, args.discount_factor, args.online_update_step, args.target_update_step, online_net, target_net, sess, coord)
     workers = Worker(
         env_name=args.env_name,
         num_actions=num_actions,
@@ -111,4 +113,5 @@ with tf.Session() as sess:
         savepath = savepath,
         videodir=videodir
     )
+    # Run all threads
     workers.run()
