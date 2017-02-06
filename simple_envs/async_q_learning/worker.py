@@ -63,7 +63,8 @@ class Worker:
 
         # TODO: add monitor
         # Create a monitor for only one env
-        #     env = wrappers.Monitor(env=env, directory='test', force=True)
+        if name == 0:
+            env = wrappers.Monitor(env=env, directory=self.videodir, force=True)
 
         get_epsilon = get_epsilon_op(self.final_epsilon, self.stop_exploration)
         # Repeat until coord requests a stop
