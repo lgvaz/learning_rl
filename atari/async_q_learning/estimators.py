@@ -53,17 +53,20 @@ class QNet:
         actions_value = tf.gather(tf.reshape(self.outputs, [-1]), actions_ids)
         # Calculate mean squared error
         self.loss = tf.reduce_mean(tf.squared_difference(self.targets, actions_value))
-        opt = tf.train.AdamOptimizer(learning_rate)
+#        opt = tf.train.AdamOptimizer(learning_rate)
+        opt = tf.train.RMSPropOptimizer(learning_rate, 0.99, 0.0, 1e-6)
         # Get list of variables given by scope
         local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
         # Calcuate gradients
-        # grads, _ = opt.compute_gradients(self.loss, local_vars)
+#        grads_and_vars  = opt.compute_gradients(self.loss, local_vars)
         grads = tf.gradients(self.loss, local_vars)
         if clip_grads == 'Y':
-            # grads_and_vars = [(tf.clip_by_value(grad, -1, 1), var)
-            #                  for grad, var in grads_and_vars]
+#           grads_and_vars = [(tf.clip_by_value(grad, -1, 1), var)
+#                             for grad, var in grads_and_vars]
             clipped_grads, _ = tf.clip_by_global_norm(grads, 40.)
             grads_and_vars = list(zip(clipped_grads, local_vars))
+        else:
+            grads_and_vars = list(zip(grads, local_vars))
         self.training_op = opt.apply_gradients(grads_and_vars)
 
         if create_summary:
