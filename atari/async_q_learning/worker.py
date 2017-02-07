@@ -122,13 +122,10 @@ class Worker:
                     print('Updating target network...')
                     self.target_update()
 
-                # Write summary
+                # Write logs and checkpoint
                 if global_step_value % 10000 == 0:
                     print('Writing summary...')
                     self.summary_writer(states, actions, targets, ep_reward, local_step, global_step_value)
-
-                # Save model
-                if global_step_value % 100000 == 0:
                     print('Saving model...')
                     self.saver.save(self.sess, self.savepath)
 
